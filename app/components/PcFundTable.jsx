@@ -39,8 +39,8 @@ const NON_FROZEN_COLUMN_IDS = [
 const COLUMN_HEADERS = {
   latestNav: '最新净值',
   estimateNav: '估算净值',
-  yesterdayChangePercent: '昨日涨跌幅',
-  estimateChangePercent: '估值涨跌幅',
+  yesterdayChangePercent: '昨日涨幅',
+  estimateChangePercent: '估值涨幅',
   holdingAmount: '持仓金额',
   todayProfit: '当日收益',
   holdingProfit: '持有收益',
@@ -103,8 +103,8 @@ function SortableRow({ row, children, isTableDragging, disabled }) {
  *     code?: string;                // 基金代码（可选，只用于展示在名称下方）
  *     latestNav: string|number;     // 最新净值
  *     estimateNav: string|number;   // 估算净值
- *     yesterdayChangePercent: string|number; // 昨日涨跌幅
- *     estimateChangePercent: string|number;  // 估值涨跌幅
+ *     yesterdayChangePercent: string|number; // 昨日涨幅
+ *     estimateChangePercent: string|number;  // 估值涨幅
  *     holdingAmount: string|number;         // 持仓金额
  *     todayProfit: string|number;           // 当日收益
  *     holdingProfit: string|number;         // 持有收益
@@ -461,7 +461,7 @@ export default function PcFundTable({
       },
       {
         accessorKey: 'yesterdayChangePercent',
-        header: '昨日涨跌幅',
+        header: '昨日涨幅',
         size: 135,
         minSize: 100,
         cell: (info) => {
@@ -487,7 +487,7 @@ export default function PcFundTable({
       },
       {
         accessorKey: 'estimateChangePercent',
-        header: '估值涨跌幅',
+        header: '估值涨幅',
         size: 135,
         minSize: 100,
         cell: (info) => {

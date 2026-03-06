@@ -677,7 +677,7 @@ export default function HomePage() {
 
       if (canCalcTodayProfit) {
         const amount = holding.share * currentNav;
-        // 估值涨跌幅
+        // 估值涨幅
         const gzChange = fund.estPricedCoverage > 0.05 ? fund.estGszzl : (Number(fund.gszzl) || 0);
         profitToday = amount - (amount / (1 + gzChange / 100));
       } else {
@@ -4310,8 +4310,8 @@ export default function HomePage() {
 
                                         if (shouldHideChange) return null;
 
-                                        // 不再区分“上一交易日涨跌幅”名称，统一使用“昨日涨跌幅”
-                                        const changeLabel = hasTodayData ? '涨跌幅' : '昨日涨跌幅';
+                                        // 不再区分“上一交易日涨跌幅”名称，统一使用“昨日涨幅”
+                                        const changeLabel = hasTodayData ? '涨跌幅' : '昨日涨幅';
                                         return (
                                           <Stat
                                             label={changeLabel}
@@ -4322,7 +4322,7 @@ export default function HomePage() {
                                       })()}
                                       <Stat label="估值净值" value={f.estPricedCoverage > 0.05 ? f.estGsz.toFixed(4) : (f.gsz ?? '—')} />
                                       <Stat
-                                        label="估值涨跌幅"
+                                        label="估值涨幅"
                                         value={f.estPricedCoverage > 0.05 ? `${f.estGszzl > 0 ? '+' : ''}${f.estGszzl.toFixed(2)}%` : (isNumber(f.gszzl) ? `${f.gszzl > 0 ? '+' : ''}${f.gszzl.toFixed(2)}%` : f.gszzl ?? '—')}
                                         delta={f.estPricedCoverage > 0.05 ? f.estGszzl : (Number(f.gszzl) || 0)}
                                       />

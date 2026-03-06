@@ -37,8 +37,8 @@ const MOBILE_NON_FROZEN_COLUMN_IDS = [
 const MOBILE_COLUMN_HEADERS = {
   latestNav: '最新净值',
   estimateNav: '估算净值',
-  yesterdayChangePercent: '昨日涨跌幅',
-  estimateChangePercent: '估值涨跌幅',
+  yesterdayChangePercent: '昨日涨幅',
+  estimateChangePercent: '估值涨幅',
   todayProfit: '当日收益',
   holdingProfit: '持有收益',
 };
@@ -485,7 +485,7 @@ export default function MobileFundTable({
       },
       {
         accessorKey: 'yesterdayChangePercent',
-        header: '昨日涨跌幅',
+        header: '昨日涨幅',
         cell: (info) => {
           const original = info.row.original || {};
           const value = original.yesterdayChangeValue;
@@ -504,7 +504,7 @@ export default function MobileFundTable({
       },
       {
         accessorKey: 'estimateChangePercent',
-        header: '估值涨跌幅',
+        header: '估值涨幅',
         cell: (info) => {
           const original = info.row.original || {};
           const value = original.estimateChangeValue;
