@@ -23,6 +23,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { throttle } from 'lodash';
 import FitText from './FitText';
 import MobileSettingModal from './MobileSettingModal';
 import { ExitIcon, SettingsIcon, StarIcon } from './Icons';
@@ -308,7 +309,7 @@ export default function MobileFundTable({
       return isSummaryStuck ? stickyTop + stickySummaryWrapper.offsetHeight : stickyTop;
     };
 
-    const handleVerticalScroll = () => {
+    const updateVerticalState = () => {
       const nextStickyTop = getEffectiveStickyTop();
       setEffectiveStickyTop((prev) => (prev === nextStickyTop ? prev : nextStickyTop));
 
@@ -321,12 +322,15 @@ export default function MobileFundTable({
       setShowPortalHeader(tableRect.top <= nextStickyTop);
     };
 
-    handleVerticalScroll();
-    window.addEventListener('scroll', handleVerticalScroll, { passive: true });
-    window.addEventListener('resize', handleVerticalScroll, { passive: true });
+    const throttledVerticalUpdate = throttle(updateVerticalState, 50, { leading: true, trailing: true });
+
+    updateVerticalState();
+    window.addEventListener('scroll', throttledVerticalUpdate, { passive: true });
+    window.addEventListener('resize', throttledVerticalUpdate, { passive: true });
     return () => {
-      window.removeEventListener('scroll', handleVerticalScroll);
-      window.removeEventListener('resize', handleVerticalScroll);
+      window.removeEventListener('scroll', throttledVerticalUpdate);
+      window.removeEventListener('resize', throttledVerticalUpdate);
+      throttledVerticalUpdate.cancel();
     };
   }, [stickyTop]);
 
