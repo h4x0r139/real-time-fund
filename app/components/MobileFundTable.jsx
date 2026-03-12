@@ -752,7 +752,7 @@ export default function MobileFundTable({
                   {masked && hasProfit ? '******' : amountStr}
                 </FitText>
               </span>
-              {percentStr && !masked ? (
+              {hasProfit && percentStr && !masked ? (
                 <span className={`${cls} estimate-profit-percent`} style={{ display: 'block', width: '100%', fontSize: '0.75em', opacity: 0.9, fontWeight: 500 }}>
                   <FitText maxFontSize={11} minFontSize={9}>
                     {percentStr}

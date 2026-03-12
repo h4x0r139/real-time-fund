@@ -682,7 +682,7 @@ export default function PcFundTable({
               <FitText className={cls} style={{ fontWeight: 700, display: 'block' }} maxFontSize={14} minFontSize={10}>
                 {masked && hasProfit ? '******' : amountStr}
               </FitText>
-              {percentStr && !masked ? (
+              {hasProfit && percentStr && !masked ? (
                 <span className={`${cls} estimate-profit-percent`} style={{ display: 'block', fontSize: '0.75em', opacity: 0.9, fontWeight: 500 }}>
                   <FitText maxFontSize={11} minFontSize={9}>
                     {percentStr}
@@ -883,7 +883,7 @@ export default function PcFundTable({
         },
       },
     ],
-    [currentTab, favorites, refreshing, sortBy, showFullFundName, getFundCardProps],
+    [currentTab, favorites, refreshing, sortBy, showFullFundName, getFundCardProps, masked],
   );
 
   const table = useReactTable({
