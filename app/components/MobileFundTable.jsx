@@ -660,6 +660,7 @@ export default function MobileFundTable({
         cell: (info) => {
           const original = info.row.original || {};
           const date = original.latestNavDate ?? '-';
+          const displayDate = typeof date === 'string' && date.length > 5 ? date.slice(5) : date;
           return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0 }}>
               <span style={{ display: 'block', width: '100%', fontWeight: 700 }}>
@@ -667,7 +668,7 @@ export default function MobileFundTable({
                   {info.getValue() ?? '—'}
                 </FitText>
               </span>
-              <span className="muted" style={{ fontSize: '10px' }}>{date}</span>
+              <span className="muted" style={{ fontSize: '10px' }}>{displayDate}</span>
             </div>
           );
         },
@@ -705,13 +706,14 @@ export default function MobileFundTable({
           const original = info.row.original || {};
           const value = original.yesterdayChangeValue;
           const date = original.yesterdayDate ?? '-';
+          const displayDate = typeof date === 'string' && date.length > 5 ? date.slice(5) : date;
           const cls = value > 0 ? 'up' : value < 0 ? 'down' : '';
           return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0 }}>
               <span className={cls} style={{ fontWeight: 700 }}>
                 {info.getValue() ?? '—'}
               </span>
-              <span className="muted" style={{ fontSize: '10px' }}>{date}</span>
+              <span className="muted" style={{ fontSize: '10px' }}>{displayDate}</span>
             </div>
           );
         },
