@@ -56,7 +56,7 @@ function getChartThemeColors(theme) {
 }
 
 export default function FundTrendChart({ code, isExpanded, onToggleExpand, transactions = [], theme = 'dark', hideHeader = false }) {
-  const [range, setRange] = useState('1m');
+  const [range, setRange] = useState('3m');
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
