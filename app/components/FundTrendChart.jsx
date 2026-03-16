@@ -166,14 +166,28 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
       const key = `${series.name || 'series'}_${idx}`;
       const isHidden = hiddenGrandSeries.has(key);
       const pointsByDate = new Map(series.points.map(p => [p.date, p.value]));
-      const seriesData = labels.map(date => {
+
+      // 方案 2：将对比线同样归一到当前区间首日，展示为“相对本区间首日的累计收益率（百分点变化）”
+      let baseValue = null;
+      for (const date of labels) {
         const v = pointsByDate.get(date);
-        if (isHidden) return null;
-        return typeof v === 'number' ? v : null;
+        if (typeof v === 'number' && Number.isFinite(v)) {
+          baseValue = v;
+          break;
+        }
+      }
+
+      const seriesData = labels.map(date => {
+        if (isHidden || baseValue == null) return null;
+        const v = pointsByDate.get(date);
+        if (typeof v !== 'number' || !Number.isFinite(v)) return null;
+        // Data_grandTotal 中的 value 已是百分比，这里按区间首日做“差值”，保持同一坐标含义（相对区间首日的收益率变化）
+        return v - baseValue;
       });
+
       return {
         type: 'line',
-        label: series.name || '累计收益',
+        label: series.name || '累计收益率',
         data: seriesData,
         borderColor: color,
         backgroundColor: color,
@@ -191,7 +205,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
       datasets: [
         {
           type: 'line',
-          label: '净值涨跌幅',
+          label: '本基金',
           data: percentageData,
           borderColor: lineColor,
           backgroundColor: (context) => {
@@ -576,7 +590,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
                 backgroundColor: lineColor
               }}
             />
-            <span className="muted">净值涨跌幅</span>
+            <span className="muted">本基金</span>
           </div>
           {currentIndex != null && percentageData[currentIndex] !== undefined && (
             <span
@@ -607,11 +621,24 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
             let valueText = '--';
             if (!isHidden && currentIndex != null && data[currentIndex]) {
               const targetDate = data[currentIndex].date;
-              const point = Array.isArray(series.points)
-                ? series.points.find(p => p.date === targetDate)
-                : null;
-              if (point && typeof point.value === 'number') {
-                valueText = `${point.value.toFixed(2)}%`;
+
+              // 与折线一致：对比线显示“相对当前区间首日”的累计收益率变化
+              const pointsArray = Array.isArray(series.points) ? series.points : [];
+              const pointsByDate = new Map(pointsArray.map(p => [p.date, p.value]));
+
+              let baseValue = null;
+              for (const d of data) {
+                const v = pointsByDate.get(d.date);
+                if (typeof v === 'number' && Number.isFinite(v)) {
+                  baseValue = v;
+                  break;
+                }
+              }
+
+              const rawPoint = pointsByDate.get(targetDate);
+              if (baseValue != null && typeof rawPoint === 'number' && Number.isFinite(rawPoint)) {
+                const normalized = rawPoint - baseValue;
+                valueText = `${normalized.toFixed(2)}%`;
               }
             }
             return (
@@ -644,9 +671,10 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
                     className="muted"
                     style={{ opacity: isHidden ? 0.5 : 1 }}
                   >
-                    {series.name || '累计收益'}
+                    {series.name}
                   </span>
                   <button
+                    className="muted"
                     type="button"
                     style={{
                       border: 'none',
@@ -683,18 +711,18 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
                     </svg>
                   </button>
                 </div>
-                {!isHidden && valueText !== '--' && (
-                  <span
-                    className="muted"
-                    style={{
-                      fontSize: 10,
-                      fontVariantNumeric: 'tabular-nums',
-                      paddingLeft: 14,
-                    }}
-                  >
-                    {valueText}
-                  </span>
-                )}
+                <span
+                  className="muted"
+                  style={{
+                    fontSize: 10,
+                    fontVariantNumeric: 'tabular-nums',
+                    paddingLeft: 14,
+                    minHeight: 14,
+                    visibility: isHidden || valueText === '--' ? 'hidden' : 'visible',
+                  }}
+                >
+                  {valueText}
+                </span>
               </div>
             );
           })}
