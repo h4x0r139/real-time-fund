@@ -600,26 +600,30 @@ export default function HomePage() {
 
       if (canCalcTodayProfit) {
         const amount = holding.share * currentNav;
-        // 优先用 zzl (真实涨跌幅), 降级用 gszzl
-        // 若 gztime 日期 > jzrq，说明估值更新晚于净值日期，优先使用 gszzl 计算当日盈亏
-        const gz = isString(fund.gztime) ? toTz(fund.gztime) : null;
-        const jz = isString(fund.jzrq) ? toTz(fund.jzrq) : null;
-        const preferGszzl =
-          !!gz &&
-          !!jz &&
-          gz.isValid() &&
-          jz.isValid() &&
-          gz.startOf('day').isAfter(jz.startOf('day'));
-
-        let rate;
-        if (preferGszzl) {
-          rate = Number(fund.gszzl);
+        // 优先使用昨日净值直接计算（更精确，避免涨跌幅四舍五入误差）
+        const lastNav = fund.lastNav != null && fund.lastNav !== '' ? Number(fund.lastNav) : null;
+        if (lastNav && Number.isFinite(lastNav) && lastNav > 0) {
+          profitToday = (currentNav - lastNav) * holding.share;
         } else {
-          const zzl = fund.zzl !== undefined ? Number(fund.zzl) : Number.NaN;
-          rate = Number.isFinite(zzl) ? zzl : Number(fund.gszzl);
+          const gz = isString(fund.gztime) ? toTz(fund.gztime) : null;
+          const jz = isString(fund.jzrq) ? toTz(fund.jzrq) : null;
+          const preferGszzl =
+            !!gz &&
+            !!jz &&
+            gz.isValid() &&
+            jz.isValid() &&
+            gz.startOf('day').isAfter(jz.startOf('day'));
+
+          let rate;
+          if (preferGszzl) {
+            rate = Number(fund.gszzl);
+          } else {
+            const zzl = fund.zzl !== undefined ? Number(fund.zzl) : Number.NaN;
+            rate = Number.isFinite(zzl) ? zzl : Number(fund.gszzl);
+          }
+          if (!Number.isFinite(rate)) rate = 0;
+          profitToday = amount - (amount / (1 + rate / 100));
         }
-        if (!Number.isFinite(rate)) rate = 0;
-        profitToday = amount - (amount / (1 + rate / 100));
       } else {
         profitToday = null;
       }
