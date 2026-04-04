@@ -35,7 +35,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { DragIcon, ExitIcon, SettingsIcon, StarIcon, TrashIcon, ResetIcon } from './Icons';
-import { fetchRelatedSectors } from '@/app/api/fund';
+import { fetchRelatedSectors, fetchRelatedSectorLiveQuote } from '@/app/api/fund';
 
 const NON_FROZEN_COLUMN_IDS = [
   'relatedSector',
@@ -462,6 +462,7 @@ export default function PcFundTable({
   const relatedSectorEnabled = columnVisibility?.relatedSector !== false;
   const relatedSectorCacheRef = useRef(new Map());
   const [relatedSectorByCode, setRelatedSectorByCode] = useState({});
+  const [sectorQuoteByLabel, setSectorQuoteByLabel] = useState({});
 
   const fetchRelatedSector = async (code) => fetchRelatedSectors(code);
 
@@ -472,7 +473,7 @@ export default function PcFundTable({
       while (queue.length) {
         const item = queue.shift();
         if (item == null) continue;
-         
+
         results.push(await worker(item));
       }
     });
@@ -503,6 +504,44 @@ export default function PcFundTable({
 
     return () => { cancelled = true; };
   }, [relatedSectorEnabled, data]);
+
+  useEffect(() => {
+    if (!relatedSectorEnabled) return;
+    if (!Array.isArray(data) || data.length === 0) return;
+
+    const labels = new Set();
+    for (const row of data) {
+      const code = row?.code;
+      const lbl = code && relatedSectorByCode[code];
+      const t = lbl != null ? String(lbl).trim() : '';
+      if (t) labels.add(t);
+    }
+    if (labels.size === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      await runWithConcurrency([...labels], 4, async (label) => {
+        const quote = await fetchRelatedSectorLiveQuote(label);
+        if (cancelled) return;
+        setSectorQuoteByLabel((prev) => {
+          const prevQ = prev[label];
+          if (prevQ === quote) return prev;
+          if (
+            prevQ &&
+            quote &&
+            prevQ.pct === quote.pct &&
+            prevQ.name === quote.name &&
+            prevQ.code === quote.code
+          ) {
+            return prev;
+          }
+          return { ...prev, [label]: quote };
+        });
+      });
+    })();
+
+    return () => { cancelled = true; };
+  }, [relatedSectorEnabled, data, relatedSectorByCode]);
 
   useEffect(() => {
     const tableEl = tableContainerRef.current;
@@ -634,9 +673,47 @@ export default function PcFundTable({
           const code = original.code;
           const value = (code && (relatedSectorByCode?.[code] ?? relatedSectorCacheRef.current.get(code))) || '';
           const display = value || '—';
+          const labelKey = value ? String(value).trim() : '';
+          const quote = labelKey ? sectorQuoteByLabel?.[labelKey] : null;
+          const nameFromQuote = quote?.name != null ? String(quote.name).trim() : '';
+          const firstLine = nameFromQuote || display;
+          const pct = quote?.pct;
+          const pctText = pct != null ? `${pct > 0 ? '+' : ''}${pct.toFixed(2)}%` : null;
+          const pctCls = pct != null ? (pct > 0 ? 'up' : pct < 0 ? 'down' : '') : '';
           return (
-            <div style={{ width: '100%', textAlign: value ? 'left' : 'right', fontSize: '14px' }}>
-              {display}
+            <div
+              style={{
+                width: '100%',
+                minWidth: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'stretch',
+                gap: 2,
+              }}
+            >
+              <span
+                title={firstLine !== '—' ? firstLine : undefined}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  minWidth: 0,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  textAlign: 'right',
+                  fontSize: '14px',
+                }}
+              >
+                {firstLine}
+              </span>
+              {pctText != null ? (
+                <span
+                  className={pctCls}
+                  style={{ fontSize: '11px', fontWeight: 600, textAlign: 'right' }}
+                >
+                  {pctText}
+                </span>
+              ) : null}
             </div>
           );
         },
@@ -999,7 +1076,7 @@ export default function PcFundTable({
         },
       },
     ],
-    [currentTab, favorites, refreshing, sortBy, showFullFundName, getFundCardProps, masked, relatedSectorByCode],
+    [currentTab, favorites, refreshing, sortBy, showFullFundName, getFundCardProps, masked, relatedSectorByCode, sectorQuoteByLabel],
   );
 
   const table = useReactTable({

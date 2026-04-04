@@ -28,7 +28,7 @@ import FitText from './FitText';
 import MobileFundCardDrawer from './MobileFundCardDrawer';
 import MobileSettingModal from './MobileSettingModal';
 import { DragIcon, ExitIcon, SettingsIcon, SortIcon, StarIcon } from './Icons';
-import { fetchRelatedSectors } from '@/app/api/fund';
+import { fetchRelatedSectors, fetchRelatedSectorLiveQuote } from '@/app/api/fund';
 
 const MOBILE_NON_FROZEN_COLUMN_IDS = [
   'relatedSector',
@@ -454,6 +454,7 @@ export default function MobileFundTable({
   const relatedSectorEnabled = mobileColumnVisibility?.relatedSector !== false;
   const relatedSectorCacheRef = useRef(new Map());
   const [relatedSectorByCode, setRelatedSectorByCode] = useState({});
+  const [sectorQuoteByLabel, setSectorQuoteByLabel] = useState({});
 
   const fetchRelatedSector = async (code) => fetchRelatedSectors(code);
 
@@ -463,7 +464,7 @@ export default function MobileFundTable({
       while (queue.length) {
         const item = queue.shift();
         if (item == null) continue;
-         
+
         await worker(item);
       }
     });
@@ -493,6 +494,44 @@ export default function MobileFundTable({
 
     return () => { cancelled = true; };
   }, [relatedSectorEnabled, data]);
+
+  useEffect(() => {
+    if (!relatedSectorEnabled) return;
+    if (!Array.isArray(data) || data.length === 0) return;
+
+    const labels = new Set();
+    for (const row of data) {
+      const code = row?.code;
+      const lbl = code && relatedSectorByCode[code];
+      const t = lbl != null ? String(lbl).trim() : '';
+      if (t) labels.add(t);
+    }
+    if (labels.size === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      await runWithConcurrency([...labels], 4, async (label) => {
+        const quote = await fetchRelatedSectorLiveQuote(label);
+        if (cancelled) return;
+        setSectorQuoteByLabel((prev) => {
+          const prevQ = prev[label];
+          if (prevQ === quote) return prev;
+          if (
+            prevQ &&
+            quote &&
+            prevQ.pct === quote.pct &&
+            prevQ.name === quote.name &&
+            prevQ.code === quote.code
+          ) {
+            return prev;
+          }
+          return { ...prev, [label]: quote };
+        });
+      });
+    })();
+
+    return () => { cancelled = true; };
+  }, [relatedSectorEnabled, data, relatedSectorByCode]);
 
   const columnWidthMap = useMemo(() => {
     const visibleNonNameIds = mobileColumnOrder.filter((id) => mobileColumnVisibility[id] !== false);
@@ -727,13 +766,51 @@ export default function MobileFundTable({
           const code = original.code;
           const value = (code && (relatedSectorByCode?.[code] ?? relatedSectorCacheRef.current.get(code))) || '';
           const display = value || '—';
+          const labelKey = value ? String(value).trim() : '';
+          const quote = labelKey ? sectorQuoteByLabel?.[labelKey] : null;
+          const nameFromQuote = quote?.name != null ? String(quote.name).trim() : '';
+          const firstLine = nameFromQuote || display;
+          const pct = quote?.pct;
+          const pctText = pct != null ? `${pct > 0 ? '+' : ''}${pct.toFixed(2)}%` : null;
+          const pctCls = pct != null ? (pct > 0 ? 'up' : pct < 0 ? 'down' : '') : '';
           return (
-            <div style={{ width: '100%', textAlign: value ? 'left' : 'right', fontSize: '12px' }}>
-              {display}
+            <div
+              style={{
+                width: '100%',
+                minWidth: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'stretch',
+                gap: 2,
+              }}
+            >
+              <span
+                title={firstLine !== '—' ? firstLine : undefined}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  minWidth: 0,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  textAlign: 'right',
+                  fontSize: '12px',
+                }}
+              >
+                {firstLine}
+              </span>
+              {pctText != null ? (
+                <span
+                  className={pctCls}
+                  style={{ fontSize: '10px', fontWeight: 600, textAlign: 'right' }}
+                >
+                  {pctText}
+                </span>
+              ) : null}
             </div>
           );
         },
-        meta: { align: 'left', cellClassName: 'related-sector-cell', width: columnWidthMap.relatedSector ?? 120 },
+        meta: { align: 'right', cellClassName: 'related-sector-cell', width: columnWidthMap.relatedSector ?? 120 },
       },
       {
         accessorKey: 'latestNav',
@@ -931,7 +1008,7 @@ export default function MobileFundTable({
         meta: { align: 'right', cellClassName: 'holding-cell', width: columnWidthMap.holdingProfit },
       },
     ],
-    [currentTab, favorites, refreshing, columnWidthMap, showFullFundName, getFundCardProps, isNameSortMode, sortBy, relatedSectorByCode]
+    [currentTab, favorites, refreshing, columnWidthMap, showFullFundName, getFundCardProps, isNameSortMode, sortBy, relatedSectorByCode, sectorQuoteByLabel]
   );
 
   const table = useReactTable({

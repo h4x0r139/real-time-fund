@@ -3,6 +3,7 @@ import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import { isString } from 'lodash';
 import { cachedRequest, clearCachedRequest } from '../lib/cacheRequest';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -23,30 +24,103 @@ const toTz = (input) => (input ? dayjs.tz(input, TZ) : nowInTz());
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * 获取基金「关联板块/跟踪标的」信息（走本地 API，并做 1 天缓存）
- * 接口：/api/related-sectors?code=xxxxxx
- * 返回：{ code: string, relatedSectors: string }
+ * 获取基金「关联板块」：查询 Supabase `fund_related` 表（fund_code → related_sector），并做 1 天缓存
+ * 返回：展示用字符串，无数据或失败时为空字符串
  */
 export const fetchRelatedSectors = async (code, { cacheTime = ONE_DAY_MS } = {}) => {
   if (!code) return '';
   const normalized = String(code).trim();
   if (!normalized) return '';
+  if (!isSupabaseConfigured) return '';
 
-  const url = `/api/related-sectors?code=${encodeURIComponent(normalized)}`;
   const cacheKey = `relatedSectors:${normalized}`;
 
   try {
-    const data = await cachedRequest(async () => {
-      const res = await fetch(url);
-      if (!res.ok) return null;
-      return await res.json();
+    const relatedSectors = await cachedRequest(async () => {
+      const { data, error } = await supabase
+        .from('fund_related')
+        .select('related_sector')
+        .eq('fund_code', normalized)
+        .maybeSingle();
+
+      if (error || !data) return '';
+      const raw = data.related_sector;
+      return raw != null && raw !== '' ? String(raw).trim() : '';
     }, cacheKey, { cacheTime });
 
-    const relatedSectors = data?.relatedSectors;
-    return relatedSectors ? String(relatedSectors).trim() : '';
+    return relatedSectors || '';
   } catch (e) {
     return '';
   }
+};
+
+const SECTOR_QUOTE_CACHE_MS = 60 * 1000;
+
+/**
+ * 根据 `fund_secid.related_sector` 查询东方财富 secid（如 2.931066）
+ */
+export const fetchFundSecidByRelatedSector = async (relatedSector, { cacheTime = ONE_DAY_MS } = {}) => {
+  const normalized = relatedSector != null ? String(relatedSector).trim() : '';
+  if (!normalized || !isSupabaseConfigured) return '';
+
+  const cacheKey = `fundSecid:${normalized}`;
+  try {
+    const secid = await cachedRequest(async () => {
+      const { data, error } = await supabase
+        .from('fund_secid')
+        .select('secid')
+        .eq('related_sector', normalized)
+        .maybeSingle();
+
+      if (error || !data?.secid) return '';
+      return String(data.secid).trim();
+    }, cacheKey, { cacheTime });
+
+    return secid || '';
+  } catch (e) {
+    return '';
+  }
+};
+
+/**
+ * 东方财富 push2delay 板块/指数行情（涨跌幅等）
+ * @returns {{ name: string, code: string, pct: number|null }|null}
+ */
+export const fetchEastmoneySectorQuote = async (secid, { cacheTime = SECTOR_QUOTE_CACHE_MS } = {}) => {
+  const s = secid != null ? String(secid).trim() : '';
+  if (!s || typeof fetch === 'undefined') return null;
+
+  const cacheKey = `eastSectorQuote:${s}`;
+  try {
+    const quote = await cachedRequest(async () => {
+      const url = `https://push2delay.eastmoney.com/api/qt/stock/get?secid=${encodeURIComponent(s)}&fields=f58,f57,f43,f170,f169,f124,f86`;
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const json = await res.json();
+      const d = json?.data;
+      if (!d) return null;
+      const f170 = d.f170;
+      const pct = f170 != null && Number.isFinite(Number(f170)) ? Number(f170) / 100 : null;
+      return {
+        name: d.f58 != null ? String(d.f58) : '',
+        code: d.f57 != null ? String(d.f57) : '',
+        pct,
+      };
+    }, cacheKey, { cacheTime });
+
+    return quote || null;
+  } catch (e) {
+    return null;
+  }
+};
+
+/**
+ * 关联板块名称 → 实时涨跌幅（先查 fund_secid，再拉东方财富）
+ */
+export const fetchRelatedSectorLiveQuote = async (relatedSectorLabel) => {
+  const secid = await fetchFundSecidByRelatedSector(relatedSectorLabel);
+  if (!secid) return null;
+  return fetchEastmoneySectorQuote(secid);
 };
 
 export const loadScript = (url) => {
