@@ -1,10 +1,10 @@
 'use client';
 
 import ReactDOM from 'react-dom';
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { throttle } from 'lodash';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import {
   flexRender,
   getCoreRowModel,
@@ -198,6 +198,9 @@ export default function PcFundTable({
   const [activeId, setActiveId] = useState(null);
   const [cardDialogRow, setCardDialogRow] = useState(null);
   const tableContainerRef = useRef(null);
+  /** 窗口虚拟列表锚点：用于 scrollMargin（.table-scroll-area 仅横向滚动，纵向为整页滚动） */
+  const virtualScrollAnchorRef = useRef(null);
+  const [virtualScrollMargin, setVirtualScrollMargin] = useState(0);
   const portalHeaderRef = useRef(null);
   const [showPortalHeader, setShowPortalHeader] = useState(false);
   const [effectiveStickyTop, setEffectiveStickyTop] = useState(stickyTop);
@@ -1516,13 +1519,39 @@ export default function PcFundTable({
 
   const headerGroup = table.getHeaderGroups()[0];
   const tableRows = table.getRowModel().rows;
-  const enableVirtualization = sortBy !== 'default' && data.length > 60;
-  const rowVirtualizer = useVirtualizer({
+  const enableVirtualization = data.length > 40;
+  const rowVirtualizer = useWindowVirtualizer({
     count: tableRows.length,
-    getScrollElement: () => tableContainerRef.current?.closest?.('.table-scroll-area') || null,
-    estimateSize: () => 48,
-    overscan: 10,
+    estimateSize: () => 72,
+    measureElement: (el) => el.getBoundingClientRect().height,
+    overscan: 8,
+    scrollMargin: virtualScrollMargin,
+    enabled: enableVirtualization,
   });
+
+  useLayoutEffect(() => {
+    if (!enableVirtualization) return;
+    const el = virtualScrollAnchorRef.current;
+    if (!el) return;
+    const update = () => {
+      setVirtualScrollMargin(el.getBoundingClientRect().top + window.scrollY);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    const scrollArea = el.closest?.('.table-scroll-area');
+    if (scrollArea) ro.observe(scrollArea);
+    window.addEventListener('resize', update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', update);
+    };
+  }, [enableVirtualization, tableRows.length, stickyTop]);
+
+  useEffect(() => {
+    if (!enableVirtualization) return;
+    rowVirtualizer.measure();
+  }, [enableVirtualization, tableRows.length, rowVirtualizer]);
 
   const getCommonPinningStyles = (column, isHeader) => {
     const isPinned = column.getIsPinned();
@@ -1690,6 +1719,13 @@ export default function PcFundTable({
         .resizer.disabled::after {
           opacity: 0;
         }
+
+        /* 窗口级纵向虚拟滚动：表体自身不出现纵向滚动条，仅随页面滚动 */
+        .pc-fund-table-body-virtual {
+          overflow-x: visible;
+          overflow-y: visible;
+          width: 100%;
+        }
       `}</style>
         {/* 表头 */}
         {renderTableHeader(false)}
@@ -1697,23 +1733,31 @@ export default function PcFundTable({
         {/* 表体 */}
         {enableVirtualization ? (
           <div
-            style={{
-              height: rowVirtualizer.getTotalSize(),
-              position: 'relative',
-            }}
+            ref={virtualScrollAnchorRef}
+            className="pc-fund-table-body-virtual"
+            style={{ position: 'relative', width: '100%' }}
           >
+            <div
+              style={{
+                height: rowVirtualizer.getTotalSize(),
+                position: 'relative',
+                width: '100%',
+              }}
+            >
             {rowVirtualizer.getVirtualItems().map((virtualRow) => {
               const row = tableRows[virtualRow.index];
               if (!row) return null;
               return (
                 <div
                   key={row.original.code || row.id}
+                  data-index={virtualRow.index}
+                  ref={rowVirtualizer.measureElement}
                   style={{
                     position: 'absolute',
                     top: 0,
                     left: 0,
                     width: '100%',
-                    transform: `translateY(${virtualRow.start}px)`,
+                    transform: `translateY(${virtualRow.start - rowVirtualizer.options.scrollMargin}px)`,
                   }}
                 >
                   <div
@@ -1748,6 +1792,7 @@ export default function PcFundTable({
                 </div>
               );
             })}
+            </div>
           </div>
         ) : (
           <DndContext
