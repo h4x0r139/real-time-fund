@@ -357,7 +357,7 @@ export default function FundCard({
                 持仓金额 {holdingLocked ? null : <SettingsIcon width="12" height="12" style={{ opacity: 0.7 }} />}
               </span>
               <span className="value">
-                {masked ? '******' : `${profit.amount.toFixed(2)}`}
+                {masked ? '******' : `${Number(profit.amount).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
               </span>
             </div>
             {holding?.firstPurchaseDate && !masked && (() => {

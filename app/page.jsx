@@ -1486,7 +1486,7 @@ export default function HomePage() {
         const profit = getHoldingProfitForTab(f, holding);
         const amount = profit ? profit.amount : null;
         const holdingAmount =
-          amount == null ? '未设置' : `¥${amount.toFixed(2)}`;
+          amount == null ? '未设置' : `¥${Number(amount).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         const holdingAmountValue = amount;
         const holdingDaysValue = holding?.firstPurchaseDate
           ? dayjs.tz(todayStr, TZ).diff(dayjs.tz(holding.firstPurchaseDate, TZ), 'day')
@@ -6183,14 +6183,6 @@ export default function HomePage() {
     return () => window.removeEventListener('keydown', onKey);
   }, [settingsOpen]);
 
-  const getGroupName = () => {
-    if (currentTab === 'all') return '全部资产';
-    if (currentTab === 'fav') return '自选资产';
-    if (currentTab === SUMMARY_TAB_ID) return '汇总资产';
-    const group = groups.find(g => g.id === currentTab);
-    return group ? `${group.name}资产` : '分组资产';
-  };
-
   const containerClassName = [
     'container',
     isMobile && mobileMainTab === 'mine' ? 'mine-mobile-root' : 'content',
@@ -6994,7 +6986,8 @@ export default function HomePage() {
               <GroupSummary
                   funds={displayFunds}
                   holdings={holdingsForTabWithLinked}
-                  groupName={getGroupName()}
+                  portfolioTabId={currentTab}
+                  groups={groups}
                   getProfit={getHoldingProfitForTab}
                   summaryTotalsOverride={
                     currentTab === SUMMARY_TAB_ID ? summaryTabPortfolioTotals : null
