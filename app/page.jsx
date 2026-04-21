@@ -6182,7 +6182,8 @@ export default function HomePage() {
               name: String(g?.name ?? '').trim(),
               codes: cleanCodeArray(g?.codes, nextFundCodes),
             }))
-            .filter((g) => g.codes.length > 0)
+            // 保留“空分组”（codes 允许为空）；仅丢弃无名称分组，避免云端应用时误删用户刚新建的分组
+            .filter((g) => g.name.length > 0)
         : [];
       setGroups(nextGroups);
       storageHelper.setItem('groups', JSON.stringify(nextGroups));
